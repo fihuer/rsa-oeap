@@ -4,6 +4,7 @@ import (
   "fmt"
   "time"
   "math/big"
+  "math"
   b64 "encoding/base64"
   "crypto/rsa"
   "crypto/rand"
@@ -27,11 +28,11 @@ func encryptOAEP(msg []byte) string{
   return oeap
 }
 
-func decryptOAEP(msg string) string{
+func decryptOAEP(msg string) (string, error){
   oeap_in, _ := b64.StdEncoding.DecodeString(msg)
   fmt.Println("OAEP decrypt")
-  oeap_out, _ := rsa.DecryptOAEP(hash, randReader, privKey, oeap_in, label)
-  return string(oeap_out)
+  oeap_out, err := rsa.DecryptOAEP(hash, randReader, privKey, oeap_in, label)
+  return string(oeap_out), err
 }
 
 func encryptPKCS(msg []byte) string{
@@ -41,11 +42,11 @@ func encryptPKCS(msg []byte) string{
   return pkcs
 }
 
-func decryptPKCS(msg string) string{
+func decryptPKCS(msg string) (string, error){
   pkcs_in, _ := b64.StdEncoding.DecodeString(msg)
   fmt.Println("PKCS decrypt")
-  pkcs_out, _ := rsa.DecryptPKCS1v15(randReader, privKey, pkcs_in)
-  return string(pkcs_out)
+  pkcs_out, err := rsa.DecryptPKCS1v15(randReader, privKey, pkcs_in)
+  return string(pkcs_out), err
 }
 
 func toInt(msg string) big.Int{
@@ -61,6 +62,30 @@ func fromInt(int_msg big.Int) string{
   return val
 }
 
+func pkcsconform(c big.Int) bool{
+  b := fromInt(c)
+  _, err := decryptPKCS(b)
+  fmt.Println(c)
+  return err==nil
+}
+
+func bleichenbacher(c big.Int){
+  cprim := big.NewInt(0)
+  old := big.NewInt(0)
+  fmt.Println("Searching a PKCS conform message")
+  for !pkcsconform(*cprim){
+    fmt.Println("Same as previous : ", cprim==old)
+    max := big.NewInt(int64(  math.Pow(2, 30)))
+    s, _ := rand.Int(randReader, max)
+    temp := big.NewInt(0)
+    temp.Mul(&c, s)
+    cprim = big.NewInt(0)
+    cprim.Exp(temp, big.NewInt(int64(pubKey.E)), pubKey.N)
+    fmt.Println(pkcsconform(*cprim))
+  }
+
+}
+
 func main(){
   fmt.Println("Done generation")
   elapsed := time.Since(start)
@@ -70,11 +95,10 @@ func main(){
   elapsed = time.Since(start)
   fmt.Println("Took : ", elapsed)
   fmt.Println("oaep out : "+oaep)
-  fmt.Println("oeap int : ",toInt(oaep))
-  fmt.Println("oeap from int : ",fromInt(toInt(oaep)))
   fmt.Println("Decrypting ...")
   start = time.Now()
-  fmt.Println("oaep decrypt : "+decryptOAEP(oaep))
+  dec, _ := decryptOAEP(oaep)
+  fmt.Println("oaep decrypt : "+dec)
   elapsed = time.Since(start)
   fmt.Println("Took : ", elapsed)
   start = time.Now()
@@ -83,7 +107,10 @@ func main(){
   fmt.Println("Took : ", elapsed)
   fmt.Println("pkcs out : "+pkcs)
   start = time.Now()
-  fmt.Println("pkcs decrypt : "+decryptPKCS(pkcs))
+  dec, _ = decryptPKCS(pkcs)
+  fmt.Println("pkcs decrypt : "+dec)
   elapsed = time.Since(start)
   fmt.Println("Took : ", elapsed)
+  c := toInt(pkcs)
+  bleichenbacher(c)
 }
