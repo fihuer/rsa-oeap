@@ -3,6 +3,7 @@ package main
 import (
   "fmt"
   "time"
+  "math/big"
   b64 "encoding/base64"
   "crypto/rsa"
   "crypto/rand"
@@ -13,7 +14,7 @@ var privKey, _ = rsa.GenerateKey(rand.Reader, 4096)
 var pubKey = privKey.PublicKey
 // privkey.print()
 // pubkey.print()
-var hash = sha3.New512()
+var hash = sha3.New224()
 var randReader = rand.Reader
 var msg = []byte{'d', 'e', 'c', 'r', 'y', 'p', 't', ' ', 'm', 'e'}
 var label = []byte{'m','y','_','l', 'a', 'b', 'e', 'l'}
@@ -47,6 +48,19 @@ func decryptPKCS(msg string) string{
   return string(pkcs_out)
 }
 
+func toInt(msg string) big.Int{
+  b_msg, _ := b64.StdEncoding.DecodeString(msg)
+  val := new(big.Int)
+  val.SetBytes(b_msg)
+  return *val
+}
+
+func fromInt(int_msg big.Int) string{
+  b := int_msg.Bytes()
+  val := b64.StdEncoding.EncodeToString(b)
+  return val
+}
+
 func main(){
   fmt.Println("Done generation")
   elapsed := time.Since(start)
@@ -56,6 +70,8 @@ func main(){
   elapsed = time.Since(start)
   fmt.Println("Took : ", elapsed)
   fmt.Println("oaep out : "+oaep)
+  fmt.Println("oeap int : ",toInt(oaep))
+  fmt.Println("oeap from int : ",fromInt(toInt(oaep)))
   fmt.Println("Decrypting ...")
   start = time.Now()
   fmt.Println("oaep decrypt : "+decryptOAEP(oaep))
